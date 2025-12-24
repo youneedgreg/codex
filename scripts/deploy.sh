@@ -9,9 +9,18 @@ echo "🚀 Starting Deployment for Codex..."
 cd "$(dirname "$0")/.."
 
 # 1. Environment Check
-echo "🔑 Checking environment..."
+echo "🔑 Checking environment in $(pwd)..."
+
+# If .env is missing and we are in a runner, try to find the "real" .env in the site directory
+SITE_ENV="/home/syrian/domains/codex.syrian.zone/public_html/.env"
+if [ ! -f ".env" ] && [ -f "$SITE_ENV" ]; then
+    echo "🔗 Symlinking .env from $SITE_ENV"
+    ln -s "$SITE_ENV" .env
+fi
+
 if [ ! -f ".env" ]; then
-    echo "❌ Error: .env file missing! Please create it manually on the server."
+    echo "❌ Error: .env file missing at $(pwd)/.env"
+    echo "Please ensure your production .env exists at $SITE_ENV"
     exit 1
 fi
 
