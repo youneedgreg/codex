@@ -1,0 +1,87 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Post;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Inertia\Inertia;
+
+class FeedController extends Controller
+{
+    public function index(Request $request)
+    {
+        $user = Auth::user();
+        $tab = $request->query('tab', 'global');
+
+        if ($tab === 'following' && !$user) {
+            return redirect()->route('login');
+        }
+
+        $query = Post::with(['user' => function($q) use ($user) {
+                $q->withExists(['followers as is_following' => function($fq) use ($user) {
+                    $fq->where('follower_id', $user ? $user->id : 0);
+                }]);
+            }])
+            ->withCount('likes')
+            ->withExists(['likes as is_liked' => function($q) use ($user) {
+                $q->where('user_id', $user ? $user->id : 0);
+            }]);
+
+        if ($tab === 'following') {
+            $followingIds = $user->following()->pluck('users.id');
+            $followingIds->push($user->id);
+            $query->whereIn('user_id', $followingIds);
+        }
+
+        $posts = $query->latest()->paginate(10)->withQueryString();
+
+        // Sidebar data - Stable recommendations within the same session
+        // Force session regeneration to ensure persistence
+        if (!$request->session()->has('_token')) {
+            $request->session()->regenerate();
+        }
+        
+        $recommendedIds = $request->session()->get('feed_recommended_ids', []);
+        
+        // If empty or invalid, fetch new ones
+        if (empty($recommendedIds) || !is_array($recommendedIds)) {
+            $recommendedIds = \App\Models\User::where('is_verified', true)
+                ->where('id', '!=', $user ? $user->id : 0)
+                ->inRandomOrder()
+                ->take(5)
+                ->pluck('id')
+                ->toArray();
+            $request->session()->put('feed_recommended_ids', $recommendedIds);
+        }
+
+        // Always ensure session is saved
+        $request->session()->save();
+
+        $recommendedUsers = \App\Models\User::whereIn('id', $recommendedIds)
+            ->withExists(['followers as is_following' => function($q) use ($user) {
+                $q->where('follower_id', $user ? $user->id : 0);
+            }])
+            ->get()
+            ->sortBy(function($u) use ($recommendedIds) {
+                return array_search($u->id, $recommendedIds);
+            })
+            ->values();
+
+        $topRepos = \App\Models\Repo::where('is_own_repo', true)
+            ->whereHas('user', function($q) {
+                $q->where('is_verified', true);
+            })
+            ->orderBy('stars', 'desc')
+            ->with('user')
+            ->take(10)
+            ->get();
+
+        return Inertia::render('Feed', [
+            'posts' => $posts,
+            'tab' => $tab,
+            'recommendedUsers' => $recommendedUsers,
+            'topRepos' => $topRepos,
+        ]);
+    }
+}
