@@ -1,0 +1,18 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted # This points to your Virtualmin self-hosted runner
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run deployment script
+        run: |
+          chmod +x scripts/deploy.sh
+          ./scripts/deploy.sh

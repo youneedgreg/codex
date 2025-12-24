@@ -236,7 +236,7 @@ export default function Feed({ posts, tab, recommendedUsers, topRepos }) {
                                 <Users className="w-5 h-5 text-primary" />
                                 مطورون مقترحون
                             </CardTitle>
-                            <CardDescription>تعرف على عمالقة تطوير البرمجيات</CardDescription>
+                            <CardDescription>تعرف على الحسابات الموثقة</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4 p-5 pt-0">
                             {recommendedUsers.map(user => (
