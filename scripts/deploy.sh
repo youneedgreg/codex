@@ -8,11 +8,16 @@ echo "🚀 Starting Deployment for Codex..."
 # Ensure we are in the project root
 cd "$(dirname "$0")/.."
 
-# 1. Environment Check
+# 1. Setup Environment Path
+export PATH="$HOME/.bun/bin:$PATH"
+
+# 2. Environment Check
 echo "🔑 Checking environment in $(pwd)..."
 
 # If .env is missing and we are in a runner, try to find the "real" .env in the site directory
-SITE_ENV="/home/syrian/domains/codex.syrian.zone/public_html/.env"
+SITE_DIR="/home/syrian/domains/codex.syrian.zone/public_html"
+SITE_ENV="$SITE_DIR/.env"
+
 if [ ! -f ".env" ] && [ -f "$SITE_ENV" ]; then
     echo "🔗 Symlinking .env from $SITE_ENV"
     ln -s "$SITE_ENV" .env
@@ -23,9 +28,6 @@ if [ ! -f ".env" ]; then
     echo "Please ensure your production .env exists at $SITE_ENV"
     exit 1
 fi
-
-# 2. Update Code (Assuming this script is triggered AFTER a git pull or by the runner)
-# git pull origin main # The GitHub runner usually handles this part
 
 # 3. Backend Deployment (Laravel)
 echo "🐘 Installing PHP dependencies..."
@@ -44,14 +46,20 @@ bun install
 echo "🛠️ Building assets..."
 bun run build
 
-# 5. Optimization & Cleanup
-echo "🧹 Clearing and caching..."
+# 5. Sync to Live Directory
+echo "🔄 Syncing files to live directory: $SITE_DIR"
+# Exclusion list to avoid overwriting or deleting persistent directories
+rsync -avz --delete --exclude='.git' --exclude='node_modules' --exclude='vendor' --exclude='storage' --exclude='.env' ./ "$SITE_DIR/"
+
+# 6. Optimization & Cleanup (In the live directory)
+echo "🧹 Clearing and caching in live directory..."
+cd "$SITE_DIR"
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 php artisan optimize
 
-# 6. Restart Workers
+# 7. Restart Workers
 echo "🔄 Restarting queue workers..."
 php artisan queue:restart
 
